@@ -15,8 +15,6 @@ services:
 
   app:
     image: nextcloud:fpm-alpine
-    stdin_open: true # docker run -i
-    tty: true        # docker run -t
     restart: always
     volumes:
       - nextcloud:/var/www/html:z
@@ -33,8 +31,6 @@ services:
 
   web:
     build: ./web
-    stdin_open: true # docker run -i
-    tty: true        # docker run -t
     restart: always
     ports:
       - "8443:443"
