@@ -1,0 +1,64 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:alpine
+    restart: always
+    volumes:
+      - db:/var/lib/postgresql/data:Z
+    env_file:
+      - db.env
+
+  redis:
+    image: redis:alpine
+    restart: always
+
+  app:
+    image: nextcloud:fpm-alpine
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    restart: always
+    volumes:
+      - nextcloud:/var/www/html:z
+      - nextcloud-data:/var/www/html/data:z
+      - nextcloud-config:/var/www/html/config:z
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+    env_file:
+      - db.env
+    depends_on:
+      - db
+      - redis
+
+  web:
+    build: ./web
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    restart: always
+    ports:
+      - "8443:443"
+    volumes:
+      - nextcloud:/var/www/html:z,ro
+      - nextcloud-data:/var/www/html/data:z
+      - nextcloud-config:/var/www/html/config:z
+    depends_on:
+      - app
+
+  cron:
+    image: nextcloud:fpm-alpine
+    restart: always
+    volumes:
+      - nextcloud:/var/www/html:z
+      - nextcloud-data:/var/www/html/data:z
+      - nextcloud-config:/var/www/html/config:z
+    entrypoint: /cron.sh
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  db:
+  nextcloud:
+  nextcloud-data:
+  nextcloud-config:

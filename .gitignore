@@ -1,0 +1,9 @@
+# Database credentials
+db.env
+
+# SSL files
+web/server.crt
+web/server.key
+
+# Old copy
+compose.yaml.non
