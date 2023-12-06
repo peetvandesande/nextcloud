@@ -32,9 +32,13 @@ services:
   web:
     build: ./web
     restart: always
+    logging:
+      options:
+        tag: "{{.Name}}"
     ports:
       - "8443:443"
     volumes:
+      - /dev/log:/dev/log
       - nextcloud:/var/www/html:z,ro
       - nextcloud-data:/var/www/html/data:z
       - nextcloud-config:/var/www/html/config:z
