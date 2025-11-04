@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     restart: always
     volumes:
-      - db:/var/lib/postgresql/data:Z
+      - db:/var/lib/postgresql/data
     env_file:
       - db.env
 
@@ -12,12 +12,14 @@ services:
     restart: always
 
   app:
-    build: ./app
+    image: nextcloud:stable-fpm-alpine
     restart: always
     volumes:
-      - nextcloud:/var/www/html:z
-      - nextcloud-data:/var/www/html/data:z
-      - nextcloud-config:/var/www/html/config:z
+      - ./app/php.ini:/usr/local/etc/php/php.ini:ro
+      - nextcloud:/var/www/html
+      - nextcloud-data:/var/www/html/data
+      - nextcloud-config:/var/www/html/config
+      - ./app/php.ini:/usr/local/etc/php/php.ini
     environment:
       - POSTGRES_HOST=db
       - REDIS_HOST=redis
@@ -28,7 +30,7 @@ services:
       - redis
 
   web:
-    build: ./web
+    image: nginx:alpine
     restart: always
     logging:
       options:
@@ -36,10 +38,13 @@ services:
     ports:
       - "8443:443"
     volumes:
+      - ./web/server.crt:/etc/nginx/server.crt
+      - ./web/server.key:/etc/nginx/server.key
+      - ./web/nginx.conf:/etc/nginx/nginx.conf
       - /dev/log:/dev/log
-      - nextcloud:/var/www/html:z,ro
-      - nextcloud-data:/var/www/html/data:z
-      - nextcloud-config:/var/www/html/config:z
+      - nextcloud:/var/www/html:ro
+      - nextcloud-data:/var/www/html/data
+      - nextcloud-config:/var/www/html/config
     depends_on:
       - app
 
@@ -47,9 +52,10 @@ services:
     build: ./app
     restart: always
     volumes:
-      - nextcloud:/var/www/html:z
-      - nextcloud-data:/var/www/html/data:z
-      - nextcloud-config:/var/www/html/config:z
+      - nextcloud:/var/www/html
+      - nextcloud-data:/var/www/html/data
+      - nextcloud-config:/var/www/html/config
+      - ./app/php.ini:/usr/local/etc/php/php.ini
     entrypoint: /cron.sh
     depends_on:
       - db
