@@ -16,7 +16,7 @@ services:
     env_file:
       - db.env
     volumes:
-      - /var/backups/sylvie:/backups
+      - /var/backups:/backups
 
   redis:
     image: redis:6.2-alpine
