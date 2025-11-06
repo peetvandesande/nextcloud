@@ -1,24 +1,35 @@
 services:
   db:
-    image: postgres:16-alpine
-    restart: always
+    image: postgres:17-alpine
+    restart: unless-stopped
     volumes:
-      - pg-16-data:/var/lib/postgresql/data
+      - pg-17-data:/var/lib/postgresql/data
     env_file:
       - db.env
 
+  pg-backup:
+    image: peetvandesande/pg-backup
+    environment:
+      - BACKUP_CHOWN=34:34
+      - BACKUP_CHMOD=0640
+      - BACKUP_NAME_PREFIX=nextcloud-pg
+    env_file:
+      - db.env
+    volumes:
+      - /var/backups/sylvie:/backups
+
   redis:
     image: redis:6.2-alpine
-    restart: always
+    restart: unless-stopped
 
   app: &app
     image: nextcloud:stable-fpm-alpine
-    restart: always
+    restart: unless-stopped
     volumes:
+      - ./app/php.ini:/usr/local/etc/php/php.ini:ro
       - nextcloud:/var/www/html
       - nextcloud-data:/var/www/html/data
       - nextcloud-config:/var/www/html/config
-      - ./app/php.ini:/usr/local/etc/php/php.ini
     environment:
       - REDIS_HOST=redis
     env_file:
@@ -27,9 +38,22 @@ services:
       - db
       - redis
 
+  app-backup:
+    image: peetvandesande/file-backup
+    environment:
+      - BACKUP_CHOWN=34:34
+      - BACKUP_CHMOD=0640
+      - BACKUP_SOURCES=/var/www/html
+      - BACKUP_NAME_PREFIX=nextcloud-data
+    volumes:
+      - nextcloud:/var/www/html:ro
+      - nextcloud-data:/var/www/html/data:ro
+      - nextcloud-config:/var/www/html/config:ro
+      - /var/backups:/backups
+
   web:
     image: nginx:mainline-alpine
-    restart: always
+    restart: unless-stopped
     logging:
       options:
         tag: "{{.Name}}"
@@ -46,12 +70,12 @@ services:
     depends_on:
       - app
 
-  cron:
+  app-cron:
     <<: *app
     entrypoint: /cron.sh
 
 volumes:
-  pg-16-data:
+  pg-17-data:
   nextcloud:
   nextcloud-data:
   nextcloud-config:
