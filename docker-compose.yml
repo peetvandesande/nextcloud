@@ -2,3 +2,113 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    volumes:
+      - pg-17-data:/var/lib/postgresql/data
+    env_file:
+      - db.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  pg-backup:
+    image: peetvandesande/pg-backup
+    environment:
+      - CHOWN_UID=34
+      - CHOWN_GID=34
+      - CHMOD_MODE=0640
+      - BACKUP_NAME_PREFIX=nextcloud-pg
+    env_file:
+      - db.env
+    volumes:
+      - /var/backups:/backups
+
+  redis:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+  app: &app
+    image: nextcloud:stable-fpm-alpine
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./app/php.ini
+        target: /usr/local/etc/php/php.ini
+      - nextcloud:/var/www/html
+      - nextcloud-data:/var/www/html/data
+      - nextcloud-config:/var/www/html/config
+    environment:
+      - REDIS_HOST=redis
+    env_file:
+      - db.env
+    depends_on:
+      - db
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(extension_loaded(\"pdo\")?0:1);' && php-fpm -t >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  app-backup:
+    image: peetvandesande/file-backup
+    environment:
+      - CHOWN_UID=34
+      - CHOWN_GID=34
+      - CHMOD_MODE=0640
+      - BACKUP_PATHS=/var/www/html
+      - BACKUP_NAME_PREFIX=nextcloud-data
+    volumes:
+      - nextcloud:/var/www/html:ro
+      - nextcloud-data:/var/www/html/data:ro
+      - nextcloud-config:/var/www/html/config:ro
+      - /var/backups:/backups
+    depends_on:
+      - app
+
+  web:
+    image: nginx:mainline-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ./web/server.crt
+        target: /etc/nginx/server.crt
+      - type: bind
+        source: ./web/server.key
+        target: /etc/nginx/server.key
+      - type: bind
+        source: ./web/nginx.conf
+        target: /etc/nginx/nginx.conf
+      - nextcloud:/var/www/html:ro
+      - nextcloud-data:/var/www/html/data:ro
+      - nextcloud-config:/var/www/html/config:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --no-check-certificate -q https://127.0.0.1/status.php || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  app-cron:
+    <<: *app
+    entrypoint: /cron.sh
+    depends_on:
+      - app
+
+volumes:
+  pg-17-data:
+  nextcloud:
+  nextcloud-data:
+  nextcloud-config:
