@@ -1,11 +1,18 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: always
     volumes:
-      - pg-16-data:/var/lib/postgresql/data
+      - pg-17-data:/var/lib/postgresql/data
     env_file:
       - db.env
+
+  pg-backup:
+    image: peetvandesande/pg-backup
+    env_file:
+      - db.env
+    volumes:
+      - nextcloud-pg-backup:/backups
 
   redis:
     image: redis:6.2-alpine
@@ -35,10 +42,10 @@ services:
         tag: "{{.Name}}"
     ports:
       - 80:80
-      - 443:443
+#       - 443:443
     volumes:
-      - ./web/server.crt:/etc/nginx/server.crt
-      - ./web/server.key:/etc/nginx/server.key
+#       - ./web/server.crt:/etc/nginx/server.crt
+#       - ./web/server.key:/etc/nginx/server.key
       - ./web/nginx.conf:/etc/nginx/nginx.conf
       - nextcloud:/var/www/html:ro
       - nextcloud-data:/var/www/html/data
@@ -51,7 +58,8 @@ services:
     entrypoint: /cron.sh
 
 volumes:
-  pg-16-data:
+  pg-17-data:
+  nextcloud-pg-backup:
   nextcloud:
   nextcloud-data:
   nextcloud-config:
