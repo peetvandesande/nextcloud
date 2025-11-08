@@ -6,6 +6,11 @@ services:
       - pg-17-data:/var/lib/postgresql/data
     env_file:
       - db.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   pg-backup:
     image: peetvandesande/pg-backup
@@ -22,6 +27,11 @@ services:
   redis:
     image: redis:6.2-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
 
   app: &app
     image: nextcloud:stable-fpm-alpine
@@ -40,6 +50,12 @@ services:
     depends_on:
       - db
       - redis
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(extension_loaded(\"pdo\")?0:1);' && php-fpm -t >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   app-backup:
     image: peetvandesande/file-backup
@@ -54,6 +70,8 @@ services:
       - nextcloud-data:/var/www/html/data:ro
       - nextcloud-config:/var/www/html/config:ro
       - /var/backups:/backups
+    depends_on:
+      - app
 
   web:
     image: nginx:mainline-alpine
@@ -62,23 +80,32 @@ services:
       - "443:443"
     volumes:
       - type: bind
-        source: /web/server.crt
+        source: ./web/server.crt
         target: /etc/nginx/server.crt
       - type: bind
-        source: /web/server.key
+        source: ./web/server.key
         target: /etc/nginx/server.key
       - type: bind
-        source: /web/nginx.conf
+        source: ./web/nginx.conf
         target: /etc/nginx/nginx.conf
       - nextcloud:/var/www/html:ro
-      - nextcloud-data:/var/www/html/data
-      - nextcloud-config:/var/www/html/config
+      - nextcloud-data:/var/www/html/data:ro
+      - nextcloud-config:/var/www/html/config:ro
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --no-check-certificate -q https://127.0.0.1/status.php || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   app-cron:
     <<: *app
     entrypoint: /cron.sh
+    depends_on:
+      - app
 
 volumes:
   pg-17-data:
