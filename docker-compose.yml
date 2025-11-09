@@ -61,9 +61,13 @@ services:
       - CHOWN_UID=34
       - CHOWN_GID=34
       - CHMOD_MODE=0640
-      - BACKUP_PATHS=/var/www/html
+      - BACKUP_PATHS="/var/www/html /etc/nginx/server.crt /etc/nginx/server.key /etc/nginx/nginx.conf /usr/local/etc/php/php.ini"
       - BACKUP_NAME_PREFIX=nextcloud-data
     volumes:
+      - ./web/server.crt:/etc/nginx/server.crt:ro
+      - ./web/server.key:/etc/nginx/server.key:ro
+      - ./web/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./app/php.ini:/usr/local/etc/php/php.ini:ro
       - nextcloud:/var/www/html:ro
       - nextcloud-data:/var/www/html/data:ro
       - nextcloud-config:/var/www/html/config:ro
